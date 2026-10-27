@@ -849,7 +849,7 @@
       userOverride = true;
       const mode = btn.dataset.mode;
       setMode(mode);
-      loadStreamC(mode === '180' ? DACAST_VR180 : DACAST_URL);
+      loadStreamC(DACAST_URL);
     });
   });
 
@@ -1021,9 +1021,9 @@
     });
   });
 
-  /* Initialise Route C in VR180 mode and auto-load the VR180 stream */
+  /* Initialise Route C in VR180 mode and auto-load the flat stream */
   setMode('180');
-  loadStreamC(DACAST_VR180);
+  loadStreamC(DACAST_URL);
 
 }());
 </script>
