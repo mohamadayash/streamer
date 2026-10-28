@@ -258,6 +258,12 @@
       background: rgba(220,38,38,.06); border: 1px solid rgba(220,38,38,.18);
       border-radius: 8px; font-size: .83rem; color: var(--danger); line-height: 1.4;
     }
+    .error-box .retry-btn {
+      margin-left: 10px; padding: 3px 10px; border-radius: 6px; border: 1px solid rgba(220,38,38,.4);
+      background: rgba(220,38,38,.1); color: var(--danger); font-size: .8rem;
+      cursor: pointer; font-family: inherit; vertical-align: middle;
+    }
+    .error-box .retry-btn:hover { background: rgba(220,38,38,.2); }
 
     /* ── Embed shell (Route A / B) ─────────── */
     .embed-shell {
@@ -842,34 +848,12 @@
   }
 
   /* Sub-tab clicks switch mode */
-  let userOverride = false, urlDetectedMode = null, autoModeLabel = '';
-
   subTabBtns.forEach(btn => {
     btn.addEventListener('click', () => {
-      userOverride = true;
-      const mode = btn.dataset.mode;
-      setMode(mode);
+      setMode(btn.dataset.mode);
       loadStreamC(DACAST_URL);
     });
   });
-
-  /* Auto-detection helpers */
-  function detectByRatio(ratio) {
-    if (ratio >= 1.85 && ratio <= 2.15) return '360';
-    if (ratio >= 0.90 && ratio <= 1.10) return '180';
-    return 'flat';
-  }
-  function detectFromUrl(url) {
-    const u = (url || '').toLowerCase();
-    if (/vr\s*180|180\s*vr/.test(u))                                          return '180';
-    if (/\b360\b|equirect|panoram|spheri|photosphere|\bpano\b|\bvr\b/.test(u)) return '360';
-    return null;
-  }
-  function applyAutoMode(mode, lbl) {
-    if (userOverride) return;
-    setMode(mode);
-    autoModeLabel = `Auto: ${lbl}`;
-  }
 
   /* ── Mouse controls ───────────────────── */
   threeCanvas.addEventListener('mousedown', e => {
@@ -936,8 +920,12 @@
     dotC.className    = 'status-dot' + (state ? ' s-' + state : '');
     labelC.textContent = text;
   }
-  function showError(msg) { errorBoxC.textContent = msg; errorBoxC.style.display = 'block'; }
-  function clearError()   { errorBoxC.style.display = 'none'; errorBoxC.textContent = ''; }
+  function showError(msg) {
+    errorBoxC.innerHTML = msg + ' <button class="retry-btn" id="retryBtn">Retry</button>';
+    errorBoxC.style.display = 'block';
+    document.getElementById('retryBtn').addEventListener('click', () => loadStreamC(player.src() || DACAST_URL));
+  }
+  function clearError() { errorBoxC.style.display = 'none'; errorBoxC.innerHTML = ''; }
   function fmtTime(s) {
     if (!isFinite(s) || s < 0) return '--:--';
     const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = Math.floor(s % 60);
@@ -953,7 +941,6 @@
       if (!pl) return;
       const a = pl.attributes || {};
       const parts = [];
-      if (autoModeLabel) parts.push(`<span style="color:var(--accent)">${autoModeLabel}</span>`);
       if (a.BANDWIDTH)   parts.push(`${Math.round(a.BANDWIDTH / 1000)} kbps`);
       if (a.RESOLUTION)  parts.push(`${a.RESOLUTION.width}×${a.RESOLUTION.height}`);
       metaC.innerHTML = parts.map(p => `<span>${p}</span>`).join('');
@@ -961,14 +948,6 @@
   }, 2000);
 
   /* ── Player events ────────────────────── */
-  player.on('loadedmetadata', () => {
-    if (userOverride || urlDetectedMode) return;
-    const vid = player.el().querySelector('video');
-    if (!vid || !vid.videoWidth) return;
-    const ratio = vid.videoWidth / vid.videoHeight;
-    const mode  = detectByRatio(ratio);
-    applyAutoMode(mode, `${mode === '360' ? '360°' : mode === '180' ? 'VR180' : 'Flat'} · ${vid.videoWidth}×${vid.videoHeight}`);
-  });
   player.on('loadstart', () => { setStatusC('loading', 'Loading…'); metaC.innerHTML = ''; });
   player.on('waiting',   () => setStatusC('loading', 'Buffering…'));
   player.on('playing',   () => {
@@ -988,10 +967,7 @@
   function loadStreamC(url) {
     url = url || DACAST_URL;
     clearError();
-    userOverride = false; urlDetectedMode = null; autoModeLabel = '';
     setStatusC('loading', 'Connecting…');
-    urlDetectedMode = detectFromUrl(url);
-    if (urlDetectedMode) applyAutoMode(urlDetectedMode, urlDetectedMode === '360' ? '360°' : 'VR180');
     player.src({ src: url, type: 'application/x-mpegURL' });
     player.play().catch(() => {});
   }
@@ -1004,8 +980,8 @@
       case ' ':           e.preventDefault(); player.paused() ? player.play() : player.pause(); break;
       case 'm': case 'M': player.muted(!player.muted()); break;
       case 'f': case 'F': player.isFullscreen() ? player.exitFullscreen() : player.requestFullscreen(); break;
-      case '1': userOverride = true; setMode('flat'); break;
-      case '2': userOverride = true; setMode('180');  break;
+      case '1': setMode('flat'); break;
+      case '2': setMode('180');  break;
       case 'ArrowLeft':  e.preventDefault(); if (!isLive()) player.currentTime(Math.max(0, player.currentTime() - 10)); break;
       case 'ArrowRight': e.preventDefault(); if (!isLive()) player.currentTime(player.currentTime() + 10); break;
       case 'ArrowUp':    e.preventDefault(); player.volume(Math.min(1, player.volume() + 0.1)); break;
